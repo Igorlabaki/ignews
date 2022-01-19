@@ -18,21 +18,39 @@ export default NextAuth({
       }
     }),
   ],
-  
   secret: process.env.NEXT_AUTH_SECRET,
-  
   callbacks: {
-    async signIn(user){
-      
-      const {email} = user
+    async signIn ({user}) {
+      const { email } = user
+      try{
+        await fauna.query(
+          q.If(
+            q.Not(
+              q.Exists(
+                q.Match(
+                  q.Index('user_by_email'),
+                  q.Casefold(user.email)
+                )
+              )
+            ),
+            q.Create(
+              q.Collection('users'),
+              { data: { email } }
+            ),
+            q.Get(
+              q.Match(
+                q.Index('user_by_email'),
+                q.Casefold(user.email)
+              )
+            )
+          )
+        )  
+        return true
+      }  catch (error) {
+        console.log('Error in FaunaDB: ' + error)
 
-      await fauna.query(
-        q.Create(
-          q.Collection('users'),
-          {data:{email} }
-        )
-      )
-      return true
-    }
+        return false
+      }
+    },
   }
 })
